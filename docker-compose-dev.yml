@@ -1,0 +1,101 @@
+services:
+  api:
+    build: "./"
+    restart: "always"
+    container_name: "buerokratt-storage-ferry"
+    ports:
+      - 3000:3000
+    env_file:
+      - config/development.env
+    volumes:
+      - ./data:/api/data
+    environment:
+      - S3_ENDPOINT_URL=http://localstack:4566
+    networks:
+      - buerokratt-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: buerokratt-minio
+    ports:
+      - "9000:9000"      # API
+      - "9001:9001"      # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - buerokratt-network
+
+  # MinIO Client - Initialize buckets on startup
+  minio-init:
+    image: minio/mc:latest
+    container_name: buerokratt-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/quarantined --ignore-existing;
+      /usr/bin/mc mb myminio/validated --ignore-existing;
+      /usr/bin/mc mb myminio/flagged --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/validated;
+      echo 'MinIO buckets initialized successfully';
+      exit 0;
+      "
+    networks:
+      - buerokratt-network
+
+  clamav:
+      image: clamav/clamav:stable
+      container_name: buerokratt-clamav
+      ports:
+        - "3310:3310"
+      volumes:
+        - clamav-db:/var/lib/clamav
+        #- ./config/clamd.conf:/etc/clamav/clamd.conf:ro
+        - ./logs/clamav:/var/log/clamav
+      environment:
+        - CLAMAV_NO_FRESHCLAM=false  # Ensure virus definitions update
+      healthcheck:
+        test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+        interval: 60s
+        timeout: 30s
+        retries: 3
+        start_period: 120s  # Give time for initial DB load
+      restart: unless-stopped
+      networks:
+        - buerokratt-network
+
+  # NATS JetStream Message Broker
+  nats:
+    image: nats:latest
+    container_name: buerokratt-nats
+    ports:
+      - "4222:4222"      # Client connections
+      - "8222:8222"      # HTTP monitoring
+    command: "-js -m 8222 -sd /data"  # Enable JetStream, monitoring, and set storage directory
+    volumes:
+      - ./nats-data:/data
+    networks:
+      - buerokratt-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  clamav-db:
+
+networks:
+  buerokratt-network:
+    driver: bridge

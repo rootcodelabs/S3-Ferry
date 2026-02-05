@@ -5,4 +5,6 @@ export interface S3Config {
   readonly secretAccessKey: string;
   readonly dataBucketName: string;
   readonly dataBucketPath: string;
+  readonly quarantinedBucketName: string;
+  readonly flaggedBucketName: string;
 }
