@@ -132,20 +132,37 @@ export class ClamavScannerService implements OnModuleInit {
     this.logger.log(`   Object: ${metadata.objectName}`);
     this.logger.log('='.repeat(50));
 
-    const scanResult = await this.scanFileFromS3(metadata.objectName);
+    try {
+      const scanResult = await this.scanFileFromS3(metadata.objectName);
 
-    this.logger.log('='.repeat(50));
-    this.logger.log('📤 SCAN RESULT');
-    this.logger.log(
-      `   Status: ${scanResult.passed ? '✅ CLEAN' : '❌ INFECTED'}`,
-    );
-    this.logger.log(`   Raw: ${scanResult.rawResult}`);
-    if (scanResult.signature) {
-      this.logger.log(`   Virus: ${scanResult.signature}`);
+      this.logger.log('='.repeat(50));
+      this.logger.log('📤 SCAN RESULT');
+      this.logger.log(`Status: ${scanResult.passed ? 'CLEAN' : 'ERROR'}`);
+      this.logger.log(`   Raw: ${scanResult.rawResult}`);
+      if (scanResult.signature) {
+        this.logger.log(`   Virus: ${scanResult.signature}`);
+      }
+      this.logger.log('='.repeat(50));
+
+      await this.publishResult(metadata, scanResult);
+    } catch (error: any) {
+      // Handle scan errors (empty response, connection issues, etc.)
+      this.logger.error('='.repeat(50));
+      this.logger.error('📤 SCAN ERROR');
+      this.logger.error(`   Status: ⚠️ SCAN FAILED`);
+      this.logger.error(`   Error: ${error.message}`);
+      this.logger.error('='.repeat(50));
+
+      // Publish error result
+      await this.publishResult(metadata, {
+        passed: false,
+        rawResult: `Scan Error: ${error.message}`,
+        signature: undefined,
+      });
+
+      // Re-throw to NAK the message for retry
+      throw error;
     }
-    this.logger.log('='.repeat(50));
-
-    await this.publishResult(metadata, scanResult);
   }
 
   /**
@@ -167,6 +184,16 @@ export class ClamavScannerService implements OnModuleInit {
 
       this.logger.log(`📋 ClamAV Response: "${result}"`);
 
+      // Handle empty response
+      if (!result || result.trim() === '') {
+        this.logger.error(
+          '❌ ClamAV returned empty response - possible connection issue or scan failure',
+        );
+        throw new Error(
+          'ClamAV scan failed: No response from antivirus scanner',
+        );
+      }
+
       // Parse result
       if (result.includes('OK')) {
         return { passed: true, rawResult: result };
@@ -178,13 +205,14 @@ export class ClamavScannerService implements OnModuleInit {
         return { passed: false, rawResult: result, signature };
       }
 
-      return { passed: false, rawResult: result };
+      // Unknown response format
+      this.logger.warn(
+        `⚠️ Unexpected ClamAV response format: "${result}" - treating as scan error`,
+      );
+      throw new Error(`ClamAV scan failed: Unexpected response format`);
     } catch (error: any) {
       this.logger.error(`❌ Scan failed: ${error.message}`);
-      return {
-        passed: false,
-        rawResult: `Error: ${error.message}`,
-      };
+      throw error;
     }
   }
 
@@ -316,6 +344,11 @@ export class ClamavScannerService implements OnModuleInit {
     metadata: FileUploadedMessage['metadata'],
     scanResult: { passed: boolean; rawResult: string; signature?: string },
   ) {
+    // Determine if this is an error case (rawResult contains "Error" or "Scan Error")
+    const isScanError =
+      scanResult.rawResult.includes('Error:') ||
+      scanResult.rawResult.includes('Scan Error:');
+
     const message: ValidationResultMessage = {
       uploadId: metadata.uploadId,
       objectName: metadata.objectName,
@@ -327,14 +360,17 @@ export class ClamavScannerService implements OnModuleInit {
       validatedAt: new Date().toISOString(),
       issues: scanResult.passed
         ? undefined
-        : [
-            scanResult.signature
-              ? `Virus detected: ${scanResult.signature}`
-              : 'File infected',
-          ],
+        : isScanError
+          ? [`Scan error: ${scanResult.rawResult}`]
+          : [
+              scanResult.signature
+                ? `Virus detected: ${scanResult.signature}`
+                : 'File infected',
+            ],
       details: {
         rawResult: scanResult.rawResult,
         signature: scanResult.signature,
+        scanError: isScanError,
       },
     };
 
@@ -358,6 +394,7 @@ export class ClamavScannerService implements OnModuleInit {
         status: message.status,
         rawResult: scanResult.rawResult,
         signature: scanResult.signature,
+        scanError: isScanError,
         validatedAt: message.validatedAt,
       },
     });

@@ -181,11 +181,13 @@ export class AppController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Resume interrupted upload',
+    description:
+      'Calculates total chunks from file size and generates presigned URLs only for missing chunks. Requires file metadata to determine chunk boundaries.',
   })
   @ApiBody({ type: ResumeUploadDto })
   @ApiResponse({
     status: 200,
-    description: 'New presigned URLs generated',
+    description: 'New presigned URLs generated for missing chunks',
     type: ResumeUploadResponseDto,
   })
   @ApiResponse({
@@ -196,7 +198,9 @@ export class AppController {
   async resumeUpload(
     @Body() dto: ResumeUploadDto,
   ): Promise<ResumeUploadResponseDto> {
-    this.logger.log(`Resuming upload: ${dto.uploadId}`);
+    this.logger.log(
+      `Resuming upload: ${dto.uploadId} for file ${dto.fileName} (${dto.fileSize} bytes)`,
+    );
     return this.appService.resumeUpload(dto);
   }
 

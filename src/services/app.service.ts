@@ -630,7 +630,45 @@ export class AppService {
 
   async resumeUpload(dto: ResumeUploadDto): Promise<ResumeUploadResponseDto> {
     try {
-      // First, get the current upload status to determine which chunks are already uploaded
+      // Extract file extension
+      const extension = dto.fileName.includes('.')
+        ? `.${dto.fileName.split('.').pop()}`
+        : '';
+
+      // Get defaults from DSL config
+      const defaults = this.dslConfig?.defaults || {};
+      const maxChunkSize = defaults.maxChunkSize || 5 * 1024 * 1024; // Default: 5MB
+
+      // Try to find file type specific config
+      let fileTypeConfig = null;
+      if (this.dslConfig?.fileTypes) {
+        for (const [, config] of Object.entries(this.dslConfig.fileTypes)) {
+          const ftConfig: any = config;
+          if (
+            ftConfig.mimeTypes?.includes(dto.mimeType) ||
+            ftConfig.extensions?.includes(extension)
+          ) {
+            fileTypeConfig = ftConfig;
+            break;
+          }
+        }
+      }
+
+      // Use file type specific chunk size if found, otherwise use default
+      const effectiveMaxChunkSize =
+        fileTypeConfig?.maxChunkSize || maxChunkSize;
+
+      // Calculate chunks based on file size
+      const chunkCalculation = calculateChunks(
+        dto.fileSize,
+        effectiveMaxChunkSize,
+      );
+
+      this.logger.log(
+        `Resume upload: calculated ${chunkCalculation.totalChunks} total chunks for ${dto.fileName} (${dto.fileSize} bytes)`,
+      );
+
+      // Get the current upload status to determine which chunks are already uploaded
       const status = await this.getUploadStatus({
         uploadId: dto.uploadId,
         objectName: dto.objectName,
@@ -650,44 +688,47 @@ export class AppService {
 
       // Calculate missing chunks: all chunks from 1 to totalChunks minus uploaded ones
       const uploadedPartNumbers = status.uploadedParts.map((p) => p.partNumber);
-      const chunkNumbers: number[] = [];
-      for (let i = 1; i <= dto.totalChunks; i++) {
+      const missingChunks: number[] = [];
+      for (let i = 1; i <= chunkCalculation.totalChunks; i++) {
         if (!uploadedPartNumbers.includes(i)) {
-          chunkNumbers.push(i);
+          missingChunks.push(i);
         }
       }
 
-      if (chunkNumbers.length === 0) {
+      if (missingChunks.length === 0) {
         throw new BadRequestException(
           'All chunks have already been uploaded. Use complete endpoint to finalize.',
         );
       }
 
       this.logger.log(
-        `Resume upload: ${chunkNumbers.length} missing chunks detected - [${chunkNumbers.join(', ')}]`,
+        `Resume upload: ${missingChunks.length} missing chunks detected - [${missingChunks.join(', ')}]`,
       );
 
-      // Generate presigned URLs for the specified chunks
+      // Generate presigned URLs for the missing chunks
       const presignedUrls = await this.s3Service.generatePresignedUrlsForParts(
         dto.objectName,
         dto.uploadId,
-        chunkNumbers,
+        missingChunks,
       );
 
-      // Calculate chunk sizes (simplified - assumes fixed chunk size except last)
-      const chunkSize = 10 * 1024 * 1024; // 10MB default
+      // Build chunk info with correct byte ranges from calculated chunks
       const chunks = presignedUrls.map((urlInfo) => {
-        const isLastChunk = urlInfo.partNumber === dto.totalChunks;
-        const startByte = (urlInfo.partNumber - 1) * chunkSize;
-        const endByte = isLastChunk
-          ? startByte + chunkSize - 1 // Simplified - would need actual file size
-          : startByte + chunkSize - 1;
+        const chunkInfo = chunkCalculation.chunks.find(
+          (c) => c.chunkNumber === urlInfo.partNumber,
+        );
+
+        if (!chunkInfo) {
+          throw new Error(
+            `Chunk info not found for part ${urlInfo.partNumber}`,
+          );
+        }
 
         return {
           chunkNumber: urlInfo.partNumber,
-          size: endByte - startByte + 1,
-          startByte,
-          endByte,
+          size: chunkInfo.size,
+          startByte: chunkInfo.startByte,
+          endByte: chunkInfo.endByte,
           presignedUrl: urlInfo.url,
           expiresAt: Math.floor(Date.now() / 1000) + 3600, // 1 hour
         };
@@ -697,9 +738,6 @@ export class AppService {
         `Resume upload: generated ${chunks.length} new URLs for ${dto.uploadId}`,
       );
 
-      // All missing chunks are already in chunkNumbers from earlier calculation
-      const allMissingChunks = chunkNumbers;
-
       return {
         uploadId: dto.uploadId,
         objectName: dto.objectName,
@@ -708,9 +746,9 @@ export class AppService {
         urlsGenerated: chunks.length,
         status: status.status,
         uploadedChunks: status.uploadedChunks,
-        totalChunks: dto.totalChunks,
+        totalChunks: chunkCalculation.totalChunks,
         uploadedParts: status.uploadedParts,
-        missingChunks: allMissingChunks,
+        missingChunks: missingChunks,
       };
     } catch (error) {
       if (
