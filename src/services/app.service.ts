@@ -15,6 +15,7 @@ import {
   DataWithMetaResponseDto,
   DeleteFileBodyDto,
   DeleteS3ObjectDto,
+  DeleteS3ObjectResponseDto,
   DownloadUrlQueryDto,
   DownloadUrlResponseDto,
   FileDto,
@@ -216,7 +217,9 @@ export class AppService {
     }
   }
 
-  async deleteFromS3(dto: DeleteS3ObjectDto): Promise<void> {
+  async deleteFromS3(
+    dto: DeleteS3ObjectDto,
+  ): Promise<DeleteS3ObjectResponseDto> {
     try {
       // Validate input
       if (!dto.objectName || dto.objectName.trim() === '') {
@@ -229,9 +232,20 @@ export class AppService {
 
       this.logger.log(`Deleting S3 object: ${dto.objectName}`);
 
-      await this.s3Service.deleteObject(dto.objectName, dto.bucketName);
+      const result = await this.s3Service.deleteObject(
+        dto.objectName,
+        dto.bucketName,
+      );
 
       this.logger.log(`Successfully deleted S3 object: ${dto.objectName}`);
+
+      return {
+        objectName: result.objectName,
+        bucketName: result.bucketName,
+        status: 'deleted',
+        message: `Object '${result.objectName}' successfully deleted from bucket '${result.bucketName}'`,
+        deletedAt: new Date().toISOString(),
+      };
     } catch (error) {
       // Re-throw HTTP exceptions (BadRequestException, FileNotFoundException, etc.)
       if (

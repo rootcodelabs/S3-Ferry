@@ -570,7 +570,10 @@ export class S3Service {
   /**
    * Delete an object from S3
    */
-  async deleteObject(objectName: string, bucketName?: string): Promise<void> {
+  async deleteObject(
+    objectName: string,
+    bucketName?: string,
+  ): Promise<{ objectName: string; bucketName: string }> {
     const bucket = bucketName || this.config.dataBucketName;
 
     try {
@@ -579,6 +582,11 @@ export class S3Service {
       await this.minioClient.removeObject(bucket, objectName);
 
       this.logger.log(`Successfully deleted object: ${objectName}`);
+
+      return {
+        objectName,
+        bucketName: bucket,
+      };
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
 

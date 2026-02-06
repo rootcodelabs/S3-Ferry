@@ -27,6 +27,7 @@ import {
   DataWithMetaResponseDto,
   DeleteFileBodyDto,
   DeleteS3ObjectDto,
+  DeleteS3ObjectResponseDto,
   DownloadUrlQueryDto,
   DownloadUrlResponseDto,
   FileDto,
@@ -206,18 +207,20 @@ export class AppController {
 
   @Version('1')
   @Delete('/s3/delete')
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete an object from S3 storage',
   })
   @ApiBody({ type: DeleteS3ObjectDto })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: 'Object deleted successfully',
+    type: DeleteS3ObjectResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Object not found' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
-  async deleteS3Object(@Body() dto: DeleteS3ObjectDto): Promise<void> {
+  async deleteS3Object(
+    @Body() dto: DeleteS3ObjectDto,
+  ): Promise<DeleteS3ObjectResponseDto> {
     this.logger.log(`Deleting S3 object: ${dto.objectName}`);
     return this.appService.deleteFromS3(dto);
   }

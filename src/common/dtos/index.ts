@@ -5,6 +5,7 @@ export * from './copy-file-body.dto';
 export * from './create-file-body.dto';
 export * from './data-with-meta-response.dto';
 export * from './delete-file-body.dto';
+export * from './delete-s3-object-response.dto';
 export * from './delete-s3-object.dto';
 export * from './download-url-query.dto';
 export * from './download-url-response.dto';
