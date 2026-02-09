@@ -26,7 +26,6 @@ export interface FileUploadedMessage {
     fileSize: number;
     mimeType: string;
     uploadedAt: string;
-    bucket: string;
   };
 }
 
@@ -248,5 +247,27 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
       return null;
     }
     return this.natsConnection;
+  }
+
+  /**
+   * Check if NATS connection is established and healthy
+   */
+  async isConnected(): Promise<boolean> {
+    if (!this.natsConnection) {
+      return false;
+    }
+
+    try {
+      // Check if connection is closed
+      if (this.natsConnection.isClosed()) {
+        return false;
+      }
+
+      // Connection exists and is not closed
+      return true;
+    } catch (error) {
+      this.logger.warn(`NATS health check failed: ${error}`);
+      return false;
+    }
   }
 }

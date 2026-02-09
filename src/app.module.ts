@@ -8,6 +8,7 @@ import { AzureModule } from './azure';
 import { appConfigFactory } from './common/config';
 import { configuration } from './config';
 import { FsModule } from './fs';
+import { HealthModule } from './health';
 import { NatsModule } from './nats';
 import { S3Module } from './s3';
 import { AppService } from './services';
@@ -34,6 +35,7 @@ import { WebhooksModule } from './webhooks';
     NatsModule,
     ValidatorsModule,
     WebhooksModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

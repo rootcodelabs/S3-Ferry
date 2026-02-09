@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
+import { HealthModule } from '../health';
 import { NatsModule } from '../nats';
 import { S3Module } from '../s3';
 import { WebhooksModule } from '../webhooks';
@@ -10,7 +11,12 @@ import {
 } from './services';
 
 @Module({
-  imports: [NatsModule, S3Module, WebhooksModule],
+  imports: [
+    NatsModule,
+    S3Module,
+    WebhooksModule,
+    forwardRef(() => HealthModule),
+  ],
   providers: [
     BaseValidatorService,
     ClamavScannerService,

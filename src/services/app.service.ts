@@ -34,6 +34,7 @@ import {
   InternalServerException,
 } from '../common/exceptions';
 import { FsService } from '../fs';
+import { MetricsService } from '../health/services';
 import { NatsService } from '../nats';
 import { S3Service } from '../s3';
 import {
@@ -56,6 +57,7 @@ export class AppService {
     private readonly configService: ConfigService,
     private readonly natsService: NatsService,
     private readonly webhookService: WebhookService,
+    private readonly metricsService: MetricsService,
   ) {
     // Load DSL configuration from application.yml
     this.dslConfig = {
@@ -421,6 +423,9 @@ export class AppService {
       expiresAt: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiry
     }));
 
+    // Record upload initiated metric
+    this.metricsService.recordUpload('initiated');
+
     // Return response
     return {
       uploadId,
@@ -536,7 +541,6 @@ export class AppService {
           fileSize: totalSize,
           mimeType: mimeType,
           uploadedAt: new Date().toISOString(),
-          bucket: 'quarantined',
         },
       });
 
@@ -552,7 +556,6 @@ export class AppService {
         fileSize: totalSize,
         mimeType: mimeType,
         details: {
-          bucket: 'quarantined',
           uploadedAt: new Date().toISOString(),
           status: 'awaiting_validation',
         },
@@ -563,6 +566,9 @@ export class AppService {
         `Failed to push file to NATS validation queue: ${error}. File is in S3 quarantine but validation queue not populated.`,
       );
     }
+
+    // Record upload completed metric
+    this.metricsService.recordUpload('completed');
 
     return {
       uploadId: dto.uploadId,

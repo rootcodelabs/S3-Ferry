@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { fileTypeFromBuffer } from 'file-type';
 
+import { MetricsService } from '../../health/services';
 import {
   FileUploadedMessage,
   NatsService,
@@ -125,6 +126,7 @@ export class BaseValidatorService implements OnModuleInit {
     private readonly s3Service: S3Service,
     private readonly configService: ConfigService,
     private readonly webhookService: WebhookService,
+    private readonly metricsService: MetricsService,
   ) {
     this.loadAllowedTypesFromConfig();
   }
@@ -628,6 +630,12 @@ export class BaseValidatorService implements OnModuleInit {
     console.log('========================================');
     console.log(JSON.stringify(resultMessage, null, 2));
     console.log('========================================\n');
+
+    // Record validation metrics for Prometheus
+    this.metricsService.recordValidation(
+      'base',
+      resultMessage.status as 'passed' | 'failed',
+    );
 
     await this.natsService.publishValidationResult(resultMessage);
 

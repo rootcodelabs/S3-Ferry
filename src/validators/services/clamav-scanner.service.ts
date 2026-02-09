@@ -4,6 +4,7 @@ import { Readable } from 'stream';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { MetricsService } from '../../health/services';
 import {
   FileUploadedMessage,
   NatsService,
@@ -24,6 +25,7 @@ export class ClamavScannerService implements OnModuleInit {
     private readonly s3Service: S3Service,
     private readonly configService: ConfigService,
     private readonly webhookService: WebhookService,
+    private readonly metricsService: MetricsService,
   ) {
     this.host = this.configService.get<string>('CLAMAV_HOST') || 'localhost';
     this.port = Number(this.configService.get<string>('CLAMAV_PORT') || 3310);
@@ -375,6 +377,13 @@ export class ClamavScannerService implements OnModuleInit {
     };
 
     this.logger.log('📨 Publishing to NATS...');
+
+    // Record validation metrics for Prometheus
+    this.metricsService.recordValidation(
+      'clamav',
+      message.status as 'passed' | 'failed',
+    );
+
     await this.natsService.publishValidationResult(message);
     this.logger.log('✅ Result published');
 
@@ -407,5 +416,35 @@ export class ClamavScannerService implements OnModuleInit {
   async stopPolling() {
     this.logger.log('Stopping ClamAV polling...');
     this.isPolling = false;
+  }
+
+  /**
+   * Check if ClamAV is healthy and responding
+   */
+  async isHealthy(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const socket = new net.Socket();
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        resolve(false);
+      }, 3000); // 3 second timeout
+
+      socket.connect(this.port, this.host, () => {
+        clearTimeout(timeout);
+        socket.write('PING\n');
+      });
+
+      socket.on('data', (data) => {
+        clearTimeout(timeout);
+        const response = data.toString().trim();
+        socket.destroy();
+        resolve(response === 'PONG');
+      });
+
+      socket.on('error', () => {
+        clearTimeout(timeout);
+        resolve(false);
+      });
+    });
   }
 }
