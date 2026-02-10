@@ -17,17 +17,17 @@ export class RequestLogger implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler) {
     const request = context.switchToHttp().getRequest();
-    const { originalUrl, method, params, query, body } = request;
+    const { originalUrl, method } = request;
     const response = context.switchToHttp().getResponse();
-    
     const startTime = Date.now();
 
     return next.handle().pipe(
       tap({
         next: (data) => {
           const duration = (Date.now() - startTime) / 1000; // Convert to seconds
-          const statusCode = response.statusCode;
-          
+          // Get statusCode AFTER the response has been sent
+          const statusCode = response.statusCode || 200;
+
           // Extract route pattern (remove query params)
           const route = originalUrl.split('?')[0];
 
@@ -38,18 +38,10 @@ export class RequestLogger implements NestInterceptor {
             statusCode,
             duration,
           );
-
-          this.logger.log(
-            `Request: {method: ${method}, url: ${originalUrl}, params: ${JSON.stringify(params)}, query: ${JSON.stringify(query)}, body: ${JSON.stringify(body)}}`,
-          );
-
-          this.logger.log(
-            `Response: {statusCode: ${statusCode}, responseData: ${JSON.stringify(data ?? {})}, duration: ${duration}s}`,
-          );
         },
         error: (error) => {
           const duration = (Date.now() - startTime) / 1000;
-          const statusCode = error.status || 500;
+          const statusCode = error.status || response.statusCode || 500;
           const route = originalUrl.split('?')[0];
 
           // Record error metrics
