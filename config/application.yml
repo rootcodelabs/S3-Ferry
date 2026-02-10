@@ -119,8 +119,8 @@ actionHandlers:
 
 # Webhook Configuration (Event-Driven Callbacks)
 webhooks:
-  enabled: false  # Set to true to enable webhook notifications
-  globalUrl: "http://localhost:3001/api/webhooks"  # Default webhook endpoint
+  enabled: true  # Set to true to enable webhook notifications
+  globalUrl: "http://localhost:3003/api/webhooks"  # Default webhook endpoint
   secret: "your-webhook-secret-key-change-in-production"  # HMAC signature secret
   timeout: 5000  # HTTP request timeout in milliseconds
   retries: 3     # Number of retry attempts on failure
@@ -145,7 +145,7 @@ webhooks:
       
     clam_av_scan_failed:
       enabled: true
-      url: "http://localhost:3001/api/webhooks"
+      url: "http://localhost:3003/api/webhooks"
       
     file_validated:
       enabled: true

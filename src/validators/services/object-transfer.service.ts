@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { MetricsService } from '../../health/services';
 import { NatsService } from '../../nats/services/nats.service';
 import { S3Service } from '../../s3/services/s3.service';
 import { WebhookEventType, WebhookService } from '../../webhooks';
@@ -45,6 +46,7 @@ export class ObjectTransferService implements OnModuleInit {
     private readonly s3Service: S3Service,
     private readonly configService: ConfigService,
     private readonly webhookService: WebhookService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async onModuleInit() {
@@ -383,6 +385,9 @@ export class ObjectTransferService implements OnModuleInit {
       // Delete from quarantine
       await this.s3Service.deleteFromQuarantine(objectName);
 
+      // Record file transfer metric
+      this.metricsService.recordFileTransfer('validated');
+
       this.logger.log(
         `[OK] Successfully transferred ${objectName} to validated bucket`,
       );
@@ -450,6 +455,10 @@ export class ObjectTransferService implements OnModuleInit {
           validation.objectName,
           'flagged',
         );
+
+        // Record file transfer metric
+        this.metricsService.recordFileTransfer('flagged');
+
         this.logger.log(
           `[FLAG] Moved ${validation.objectName} to flagged bucket`,
         );
@@ -473,6 +482,9 @@ export class ObjectTransferService implements OnModuleInit {
         this.logger.log(
           `[DELETE] Deleting ${validation.objectName} from quarantine (move-to-flagged: false)`,
         );
+
+        // Record file transfer metric
+        this.metricsService.recordFileTransfer('deleted');
 
         // Send webhook notification for file deleted
         await this.webhookService.sendWebhook(WebhookEventType.FileDeleted, {

@@ -2,10 +2,12 @@ import { join } from 'path';
 
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigModule as NestConfigModule } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AzureModule } from './azure';
 import { appConfigFactory } from './common/config';
+import { RequestLogger } from './common/interceptors';
 import { configuration } from './config';
 import { FsModule } from './fs';
 import { HealthModule } from './health';
@@ -38,6 +40,12 @@ import { WebhooksModule } from './webhooks';
     HealthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLogger,
+    },
+  ],
 })
 export class AppModule {}

@@ -8,7 +8,6 @@ import {
   Logger,
   Post,
   Query,
-  UseInterceptors,
   Version,
 } from '@nestjs/common';
 import {
@@ -41,11 +40,9 @@ import {
   UploadStatusQueryDto,
   UploadStatusResponseDto,
 } from './common/dtos';
-import { RequestLogger } from './common/interceptors';
 import { AppService } from './services';
 
 @Controller('')
-@UseInterceptors(RequestLogger)
 export class AppController {
   private readonly logger = new Logger(AppController.name);
 
