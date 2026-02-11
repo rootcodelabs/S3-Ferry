@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3-ferry
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: s3-ferry
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: s3-ferry
+  template:
+    metadata:
+      labels:
+        app: s3-ferry
+    spec:
+      containers:
+      - name: s3-ferry
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: NODE_ENV
+          value: {{ .Values.environment.nodeEnv }}
+        - name: S3_ENDPOINT
+          value: {{ .Values.environment.s3.endpoint }}
+        - name: S3_ACCESS_KEY_ID
+          value: {{ .Values.environment.s3.accessKeyId }}
+        - name: S3_SECRET_ACCESS_KEY
+          value: {{ .Values.environment.s3.secretAccessKey }}
+        - name: S3_REGION
+          value: {{ .Values.environment.s3.region }}
+        - name: S3_DATA_BUCKET_NAME
+          value: {{ .Values.environment.s3.dataBucket }}
+        - name: S3_QUARANTINED_BUCKET_NAME
+          value: {{ .Values.environment.s3.quarantinedBucket }}
+        - name: S3_FLAGGED_BUCKET_NAME
+          value: {{ .Values.environment.s3.flaggedBucket }}
+        - name: CLAMAV_HOST
+          value: {{ .Values.environment.clamav.host }}
+        - name: CLAMAV_PORT
+          value: {{ .Values.environment.clamav.port }}
+        - name: NATS_URL
+          value: {{ .Values.environment.nats.url }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+        {{- if .Values.storage.enabled }}
+        volumeMounts:
+        - name: data
+          mountPath: /api/data
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.memory }}
+            cpu: {{ .Values.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.resources.limits.memory }}
+            cpu: {{ .Values.resources.limits.cpu }}
+      {{- if .Values.storage.enabled }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: s3-ferry-data
+      {{- end }}

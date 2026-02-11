@@ -38,26 +38,20 @@ export class ClamavScannerService implements OnModuleInit {
     this.startPolling();
   }
 
-  /**
-   * Verify ClamAV with EICAR test
-   */
   private async verifyClamAV() {
     try {
       const eicar =
         'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
       const result = await this.scanStream(Readable.from([Buffer.from(eicar)]));
       this.logger.log(`ClamAV Test Result: ${result}`);
-      this.logger.log('✅ ClamAV is ready');
+      this.logger.log('ClamAV is ready');
     } catch (error) {
       this.logger.error(
-        `❌ ClamAV verification failed: ${error instanceof Error ? error.message : String(error)}`,
+        `ClamAV verification failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
 
-  /**
-   * Start polling NATS for scan requests
-   */
   private async startPolling() {
     if (this.isPolling) return;
 
@@ -120,40 +114,24 @@ export class ClamavScannerService implements OnModuleInit {
     }
   }
 
-  /**
-   * Process single message from NATS
-   */
   private async processMessage(msg: any) {
     const data = JSON.parse(msg.string());
     const metadata = data.metadata || data;
 
-    this.logger.log('='.repeat(50));
-    this.logger.log('📥 SCANNING FILE (STREAMING)');
-    this.logger.log(`   File: ${metadata.fileName}`);
-    this.logger.log(`   Size: ${metadata.fileSize} bytes`);
-    this.logger.log(`   Object: ${metadata.objectName}`);
-    this.logger.log('='.repeat(50));
+    this.logger.log(
+      `Scanning: ${metadata.fileName} (${metadata.fileSize} bytes)`,
+    );
 
     try {
       const scanResult = await this.scanFileFromS3(metadata.objectName);
 
-      this.logger.log('='.repeat(50));
-      this.logger.log('📤 SCAN RESULT');
-      this.logger.log(`Status: ${scanResult.passed ? 'CLEAN' : 'ERROR'}`);
-      this.logger.log(`   Raw: ${scanResult.rawResult}`);
-      if (scanResult.signature) {
-        this.logger.log(`   Virus: ${scanResult.signature}`);
-      }
-      this.logger.log('='.repeat(50));
+      this.logger.log(
+        `Scan result: ${scanResult.passed ? 'CLEAN' : 'FAILED'} - ${scanResult.rawResult}`,
+      );
 
       await this.publishResult(metadata, scanResult);
     } catch (error: any) {
-      // Handle scan errors (empty response, connection issues, etc.)
-      this.logger.error('='.repeat(50));
-      this.logger.error('📤 SCAN ERROR');
-      this.logger.error(`   Status: ⚠️ SCAN FAILED`);
-      this.logger.error(`   Error: ${error.message}`);
-      this.logger.error('='.repeat(50));
+      this.logger.error(`Scan error: ${error.message}`);
 
       // Publish error result
       await this.publishResult(metadata, {
@@ -167,30 +145,21 @@ export class ClamavScannerService implements OnModuleInit {
     }
   }
 
-  /**
-   * Scan file from S3 using streaming (zero-copy)
-   */
   private async scanFileFromS3(objectName: string): Promise<{
     passed: boolean;
     rawResult: string;
     signature?: string;
   }> {
     try {
-      this.logger.log('🌊 Starting stream from S3 to ClamAV...');
-
       // Get readable stream from S3
       const s3Stream = await this.s3Service.downloadFileAsStream(objectName);
 
       // Scan the stream
       const result = await this.scanStream(s3Stream);
 
-      this.logger.log(`📋 ClamAV Response: "${result}"`);
-
       // Handle empty response
       if (!result || result.trim() === '') {
-        this.logger.error(
-          '❌ ClamAV returned empty response - possible connection issue or scan failure',
-        );
+        this.logger.error('ClamAV returned empty response');
         throw new Error(
           'ClamAV scan failed: No response from antivirus scanner',
         );
@@ -208,20 +177,14 @@ export class ClamavScannerService implements OnModuleInit {
       }
 
       // Unknown response format
-      this.logger.warn(
-        `⚠️ Unexpected ClamAV response format: "${result}" - treating as scan error`,
-      );
+      this.logger.warn(`Unexpected ClamAV response format: "${result}"`);
       throw new Error(`ClamAV scan failed: Unexpected response format`);
     } catch (error: any) {
-      this.logger.error(`❌ Scan failed: ${error.message}`);
+      this.logger.error(`Scan failed: ${error.message}`);
       throw error;
     }
   }
 
-  /**
-   * Scan a readable stream with ClamAV using INSTREAM protocol
-   * Stream flows: S3 -> Network -> ClamAV (zero-copy, no memory buffering)
-   */
   private async scanStream(
     inputStream: NodeJS.ReadableStream,
   ): Promise<string> {
@@ -245,14 +208,12 @@ export class ClamavScannerService implements OnModuleInit {
       // Socket event handlers
       socket.on('data', (data: Buffer) => {
         responseData += data.toString();
-        this.logger.debug(`📨 Received data from ClamAV: ${data.toString()}`);
+        this.logger.debug(`Received: ${data.toString()}`);
       });
 
       socket.on('end', () => {
         clearTimeout(timeout);
-        this.logger.log(
-          `✅ ClamAV connection closed. Total bytes sent: ${bytesWritten}`,
-        );
+        this.logger.log(`Connection closed. Bytes sent: ${bytesWritten}`);
         resolve(responseData.trim());
       });
 
@@ -264,17 +225,14 @@ export class ClamavScannerService implements OnModuleInit {
         ) {
           inputStream.destroy();
         }
-        this.logger.error(`❌ Socket error: ${err.message}`);
+        this.logger.error(`Socket error: ${err.message}`);
         reject(err);
       });
 
       // Connect to ClamAV
       socket.connect(this.port, this.host, () => {
-        this.logger.log(`📡 Connected to ClamAV at ${this.host}:${this.port}`);
-
-        // Send INSTREAM command
+        this.logger.debug(`Connected to ${this.host}:${this.port}`);
         socket.write('nINSTREAM\n');
-        this.logger.log('📤 Sent INSTREAM command');
 
         // Stream data from S3 to ClamAV
         inputStream.on('data', (chunk: Buffer) => {
@@ -288,19 +246,15 @@ export class ClamavScannerService implements OnModuleInit {
 
           bytesWritten += chunk.length;
           this.logger.debug(
-            `📤 Sent chunk: ${chunk.length} bytes (total: ${bytesWritten})`,
+            `Sent ${chunk.length} bytes (total: ${bytesWritten})`,
           );
         });
 
         inputStream.on('end', () => {
-          this.logger.log('🏁 Stream ended, sending terminator');
-
           // Send terminator (4 bytes of zeros)
           const terminator = Buffer.alloc(4);
           terminator.writeUInt32BE(0, 0);
           socket.write(terminator);
-
-          this.logger.log('✅ Terminator sent, waiting for ClamAV response...');
 
           // DON'T call socket.end() - let ClamAV close the connection
         });
@@ -308,16 +262,13 @@ export class ClamavScannerService implements OnModuleInit {
         inputStream.on('error', (err: Error) => {
           clearTimeout(timeout);
           socket.destroy();
-          this.logger.error(`❌ Stream error: ${err.message}`);
+          this.logger.error(`Stream error: ${err.message}`);
           reject(err);
         });
       });
     });
   }
 
-  /**
-   * Create NATS consumer
-   */
   private async createConsumer() {
     const connection = this.natsService.getConnection();
     if (!connection) {
@@ -336,12 +287,9 @@ export class ClamavScannerService implements OnModuleInit {
       ack_wait: 60_000_000_000,
     });
 
-    this.logger.log('✅ ClamAV consumer created');
+    this.logger.log('ClamAV consumer created');
   }
 
-  /**
-   * Publish validation result
-   */
   private async publishResult(
     metadata: FileUploadedMessage['metadata'],
     scanResult: { passed: boolean; rawResult: string; signature?: string },
@@ -376,8 +324,6 @@ export class ClamavScannerService implements OnModuleInit {
       },
     };
 
-    this.logger.log('📨 Publishing to NATS...');
-
     // Record validation metrics for Prometheus
     this.metricsService.recordValidation(
       'clamav',
@@ -385,7 +331,6 @@ export class ClamavScannerService implements OnModuleInit {
     );
 
     await this.natsService.publishValidationResult(message);
-    this.logger.log('✅ Result published');
 
     // Send webhook notification for ClamAV scan result
     const eventType = scanResult.passed
@@ -418,9 +363,6 @@ export class ClamavScannerService implements OnModuleInit {
     this.isPolling = false;
   }
 
-  /**
-   * Check if ClamAV is healthy and responding
-   */
   async isHealthy(): Promise<boolean> {
     return new Promise((resolve) => {
       const socket = new net.Socket();

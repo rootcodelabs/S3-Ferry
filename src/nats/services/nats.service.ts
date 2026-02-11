@@ -78,7 +78,13 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log('NATS JetStream initialized successfully');
     } catch (error) {
-      this.logger.error(`Failed to connect to NATS: ${error}`);
+      if (error instanceof Error && error.message.includes('stream')) {
+        this.logger.error(
+          `Failed to setup NATS streams: ${error.message}. This is critical for file validation.`,
+        );
+      } else {
+        this.logger.error(`Failed to connect to NATS: ${error}`);
+      }
       this.logger.warn(
         'NATS is unavailable - server will run without message streaming. File validation and transfer features will not work.',
       );
@@ -107,12 +113,12 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
         storage: StorageType.File,
         max_age: 7 * 24 * 60 * 60 * 1_000_000_000, // 7 days in nanoseconds
         max_msgs: 10000,
-        max_bytes: 100 * 1024 * 1024 * 1024, // 100GB total storage for files
-        max_msg_size: 500 * 1024 * 1024, // 500MB per message (large file support)
+        max_bytes: 10 * 1024 * 1024 * 1024, // 10GB total storage for files (reduced from 100GB)
+        max_msg_size: 100 * 1024 * 1024, // 100MB per message (reduced from 500MB)
       });
 
       this.logger.log(
-        `Stream ${this.config.streams.fileValidation.name} is ready (supports up to 500MB per file)`,
+        `Stream ${this.config.streams.fileValidation.name} is ready (supports up to 100MB per file)`,
       );
 
       // Setup Validation Results Stream
@@ -123,6 +129,7 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
         storage: StorageType.File,
         max_age: 30 * 24 * 60 * 60 * 1_000_000_000, // 30 days in nanoseconds
         max_msgs: 1000000,
+        max_bytes: 5 * 1024 * 1024 * 1024, // 5GB for validation results (reasonable limit)
       });
 
       this.logger.log(

@@ -64,9 +64,6 @@ export class ObjectTransferService implements OnModuleInit {
     });
   }
 
-  /**
-   * Initialize NATS KV Store for validation coordination
-   */
   private async initializeKvStore() {
     const connection = this.natsService.getConnection();
     if (!connection) {
@@ -99,9 +96,6 @@ export class ObjectTransferService implements OnModuleInit {
     }
   }
 
-  /**
-   * Initialize the consumer once during startup
-   */
   private async initializeConsumer() {
     const connection = this.natsService.getConnection();
     if (!connection) {
@@ -130,9 +124,6 @@ export class ObjectTransferService implements OnModuleInit {
     }
   }
 
-  /**
-   * Start polling VALIDATION_RESULTS stream for completed validations
-   */
   private async startPolling() {
     if (this.isPolling) {
       this.logger.warn('Polling already in progress');
@@ -184,9 +175,6 @@ export class ObjectTransferService implements OnModuleInit {
     }
   }
 
-  /**
-   * Get consumer for validation results
-   */
   private async getOrCreateConsumer() {
     const connection = this.natsService.getConnection();
     if (!connection) {
@@ -197,10 +185,6 @@ export class ObjectTransferService implements OnModuleInit {
     return await js.consumers.get('VALIDATION_RESULTS', 'object-transfer');
   }
 
-  /**
-   * Generate a valid NATS KV key from uploadId and objectName
-   * NATS KV keys cannot contain slashes or special characters
-   */
   private generateKvKey(
     uploadId: string,
     objectName: string,
@@ -216,9 +200,6 @@ export class ObjectTransferService implements OnModuleInit {
     return `val.${hash}.${validator}`;
   }
 
-  /**
-   * Process a validation result message using KV Store for coordination
-   */
   private async processValidationResult(msg: any) {
     let data: any;
     let rawString: string | undefined;
