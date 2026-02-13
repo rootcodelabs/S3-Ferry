@@ -1,0 +1,6 @@
+apiVersion: v2
+name: s3-ferry
+description: A Helm chart for S3-Ferry application with MinIO, ClamAV, NATS
+type: application
+version: 1.0.0
+appVersion: '1.0.0'

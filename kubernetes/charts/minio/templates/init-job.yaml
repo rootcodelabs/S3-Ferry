@@ -1,0 +1,31 @@
+{{- if .Values.initJob.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: minio-init
+spec:
+  template:
+    metadata:
+      labels:
+        app: minio-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: minio-init
+        image: {{ .Values.initJob.image.repository }}:{{ .Values.initJob.image.tag }}
+        imagePullPolicy: {{ .Values.initJob.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            sleep 10
+            /usr/bin/mc alias set myminio http://minio:{{ .Values.service.apiPort }} {{ .Values.credentials.rootUser }} {{ .Values.credentials.rootPassword }}
+            {{- range .Values.buckets }}
+            /usr/bin/mc mb myminio/{{ . }} --ignore-existing
+            {{- end }}
+            /usr/bin/mc anonymous set download myminio/validated
+            echo 'MinIO buckets initialized successfully'
+{{- end }}

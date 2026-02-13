@@ -21,5 +21,6 @@ FROM base as run
 ENV NODE_ENV=production
 COPY --from=dependencies /api/node_modules ./node_modules
 COPY --from=build /api/dist ./dist
+COPY config ./config
 COPY package.json ./
 CMD ["npm", "run", "start:prod"]

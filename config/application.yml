@@ -1,0 +1,160 @@
+# File Handling Service Configuration
+# Configure file upload restrictions by file type/category
+
+# Global default restrictions (fallback if file type not configured)
+defaults:
+  maxFileSize: 204857600        # 200 MB
+  maxChunkSize: 5242880         # 5 MB
+  maxConcurrentUploads: 5
+
+# Object naming strategy
+objectNaming:
+  # Strategy: 'unique' (UUID-based) or 'filename' (use original filename)
+  strategy: unique                      # Options: 'unique' | 'filename'
+  
+  # Replace existing file if object name already exists (only applies when strategy: filename)
+  replaceOnUpload: false                # true = replace, false = error if exists
+  
+  # Include date hierarchy in path (uploads/YYYY/MM/DD/)
+  includeDatePath: true                 # true = uploads/2026/02/04/file.pdf, false = uploads/file.pdf
+
+# File type specific configurations
+# Configure max file size and chunk size for each file type your application needs
+fileTypes:
+  # Images
+  images:
+    description: "Image files (JPEG, PNG, GIF, WebP)"
+    maxFileSize: 20971520         # 20 MB
+    maxChunkSize: 5242880         # 5 MB
+    mimeTypes:
+      - "image/jpeg"
+      - "image/png"
+      - "image/gif"
+      - "image/webp"
+    extensions:
+      - ".jpg"
+      - ".jpeg"
+      - ".png"
+      - ".gif"
+      - ".webp"
+
+  # PDF Documents
+  pdf:
+    description: "PDF documents"
+    maxFileSize: 104857600        # 100 MB
+    maxChunkSize: 10485760        # 10 MB
+    mimeTypes:
+      - "application/pdf"
+    extensions:
+      - ".pdf"
+
+  # Office Documents
+  documents:
+    description: "Word and Excel documents"
+    maxFileSize: 52428800         # 50 MB
+    maxChunkSize: 5242880         # 5 MB
+    mimeTypes:
+      - "application/msword"
+      - "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      - "application/vnd.ms-excel"
+      - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      - "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    extensions:
+      - ".doc"
+      - ".docx"
+      - ".xls"
+      - ".xlsx"
+      - ".ppt"
+      - ".pptx"
+
+  # Text Files
+  text:
+    description: "Plain text and CSV files"
+    maxFileSize: 10485760         # 10 MB
+    maxChunkSize: 1048576         # 1 MB
+    mimeTypes:
+      - "text/plain"
+      - "text/csv"
+      - "application/json"
+      - "application/xml"
+    extensions:
+      - ".txt"
+      - ".csv"
+      - ".json"
+      - ".xml"
+
+  # Video Files
+  videos:
+    description: "Video files"
+    maxFileSize: 524288000        # 500 MB
+    maxChunkSize: 10485760        # 10 MB
+    mimeTypes:
+      - "video/mp4"
+      - "video/webm"
+      - "video/quicktime"
+    extensions:
+      - ".mp4"
+      - ".webm"
+      - ".mov"
+
+  # Archive Files
+  archives:
+    description: "ZIP and compressed files"
+    maxFileSize: 524288000        # 500 MB
+    maxChunkSize: 20971520        # 20 MB
+    mimeTypes:
+      - "application/zip"
+      - "application/x-rar-compressed"
+      - "application/x-7z-compressed"
+      - "application/x-zip-compressed"
+    extensions:
+      - ".zip"
+      - ".rar"
+      - ".7z"
+
+# Action handlers configuration
+actionHandlers:
+  insecure files:
+    move-to-flagged: true
+
+# Webhook Configuration (Event-Driven Callbacks)
+webhooks:
+  enabled: true  # Set to true to enable webhook notifications
+  globalUrl: "http://localhost:3003/api/webhooks"  # Default webhook endpoint
+  secret: "your-webhook-secret-key-change-in-production"  # HMAC signature secret
+  timeout: 5000  # HTTP request timeout in milliseconds
+  retries: 3     # Number of retry attempts on failure
+  
+  # Event-specific configuration
+  events:
+    upload_completed:
+      enabled: true
+      url: null
+      
+    mime_validation_passed:
+      enabled: true
+      url: null
+      
+    mime_validation_failed:
+      enabled: true
+      url: null
+      
+    clam_av_scan_passed:
+      enabled: true
+      url: null
+      
+    clam_av_scan_failed:
+      enabled: true
+      url: "http://localhost:3003/api/webhooks"
+      
+    file_validated:
+      enabled: true
+      url: null
+      
+    file_flagged:
+      enabled: true
+      url: null
+      
+    file_deleted:
+      enabled: false
+      url: null

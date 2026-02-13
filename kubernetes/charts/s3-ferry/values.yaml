@@ -1,0 +1,41 @@
+namespace: buerokratt
+
+replicaCount: 1
+
+image:
+  repository: s3-ferry # Update with actual image repository
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+environment:
+  nodeEnv: development
+  s3:
+    endpoint: http://minio:9000
+    accessKeyId: minioadmin
+    secretAccessKey: minioadmin
+    region: us-east-1
+    dataBucket: validated
+    quarantinedBucket: quarantined
+    flaggedBucket: flagged
+  clamav:
+    host: clamav
+    port: 3310
+  nats:
+    url: nats://nats:4222
+
+storage:
+  enabled: false
+  size: 5Gi
+  storageClass: ''
+
+resources:
+  requests:
+    memory: '256Mi'
+    cpu: '250m'
+  limits:
+    memory: '512Mi'
+    cpu: '500m'

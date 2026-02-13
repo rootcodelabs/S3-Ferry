@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - minio
+          - server
+          - /data
+          - --console-address
+          - ":9001"
+        env:
+        - name: MINIO_ROOT_USER
+          value: {{ .Values.credentials.rootUser }}
+        - name: MINIO_ROOT_PASSWORD
+          value: {{ .Values.credentials.rootPassword }}
+        ports:
+        - name: api
+          containerPort: {{ .Values.service.apiPort }}
+          protocol: TCP
+        - name: console
+          containerPort: {{ .Values.service.consolePort }}
+          protocol: TCP
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: api
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 20
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: api
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.memory }}
+            cpu: {{ .Values.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.resources.limits.memory }}
+            cpu: {{ .Values.resources.limits.cpu }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: minio-data

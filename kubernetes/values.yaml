@@ -1,0 +1,131 @@
+# Default values for s3-ferry helm chart
+
+# Global settings
+namespace: buerokratt
+
+# MinIO Configuration
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    apiPort: 9000
+    consolePort: 9001
+  credentials:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+  storage:
+    size: 10Gi
+    storageClass: ''
+  buckets:
+    - quarantined
+    - validated
+    - flagged
+  resources:
+    requests:
+      memory: '512Mi'
+      cpu: '250m'
+    limits:
+      memory: '1Gi'
+      cpu: '500m'
+
+# MinIO Init Job
+minioInit:
+  enabled: true
+  image:
+    repository: minio/mc
+    tag: latest
+    pullPolicy: IfNotPresent
+
+# ClamAV Configuration
+clamav:
+  enabled: true
+  image:
+    repository: clamav/clamav
+    tag: stable
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3310
+  storage:
+    size: 5Gi
+    storageClass: ''
+  environment:
+    noFreshclam: false
+  healthcheck:
+    initialDelaySeconds: 120
+    periodSeconds: 60
+    timeoutSeconds: 30
+    failureThreshold: 3
+  resources:
+    requests:
+      memory: '1Gi'
+      cpu: '500m'
+    limits:
+      memory: '2Gi'
+      cpu: '1000m'
+
+# NATS Configuration
+nats:
+  enabled: true
+  image:
+    repository: nats
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    clientPort: 4222
+    monitoringPort: 8222
+  storage:
+    size: 5Gi
+    storageClass: ''
+  jetstream:
+    enabled: true
+  resources:
+    requests:
+      memory: '256Mi'
+      cpu: '250m'
+    limits:
+      memory: '512Mi'
+      cpu: '500m'
+
+# S3-Ferry Application Configuration
+s3Ferry:
+  enabled: true
+  image:
+    repository: s3-ferry
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 3000
+  environment:
+    nodeEnv: development
+    s3:
+      endpoint: http://minio:9000
+      accessKeyId: minioadmin
+      secretAccessKey: minioadmin
+      region: us-east-1
+      dataBucket: validated
+      quarantinedBucket: quarantined
+      flaggedBucket: flagged
+    clamav:
+      host: clamav
+      port: 3310
+    nats:
+      url: nats://nats:4222
+  storage:
+    enabled: false
+    size: 5Gi
+    storageClass: ''
+  resources:
+    requests:
+      memory: '256Mi'
+      cpu: '250m'
+    limits:
+      memory: '512Mi'
+      cpu: '500m'

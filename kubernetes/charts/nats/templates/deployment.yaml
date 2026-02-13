@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: nats
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+  template:
+    metadata:
+      labels:
+        app: nats
+    spec:
+      containers:
+      - name: nats
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - nats-server
+          - -js
+          - -m
+          - "{{ .Values.service.monitoringPort }}"
+          - -sd
+          - /data
+        ports:
+        - name: client
+          containerPort: {{ .Values.service.clientPort }}
+          protocol: TCP
+        - name: monitoring
+          containerPort: {{ .Values.service.monitoringPort }}
+          protocol: TCP
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: monitoring
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: monitoring
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.memory }}
+            cpu: {{ .Values.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.resources.limits.memory }}
+            cpu: {{ .Values.resources.limits.cpu }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: nats-data
