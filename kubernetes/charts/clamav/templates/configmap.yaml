@@ -1,0 +1,48 @@
+{{- if .Values.config.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clamav-config
+  namespace: {{ .Values.namespace }}
+data:
+  clamd.conf: |
+    # Network
+    TCPSocket {{ .Values.service.port }}
+    TCPAddr 0.0.0.0
+
+    # User/Group
+    User clamav
+
+    # STREAMING LIMITS
+    StreamMaxLength {{ .Values.config.streamMaxLength }}
+    MaxFileSize {{ .Values.config.maxFileSize }}
+    MaxScanSize {{ .Values.config.maxScanSize }}
+
+    # ARCHIVES
+    MaxRecursion {{ .Values.config.maxRecursion }}
+    MaxFiles {{ .Values.config.maxFiles }}
+    MaxDirectoryRecursion {{ .Values.config.maxDirectoryRecursion }}
+
+    # PERFORMANCE
+    MaxThreads {{ .Values.config.maxThreads }}
+    MaxConnectionQueueLength {{ .Values.config.maxConnectionQueueLength }}
+
+    # TIMEOUTS
+    CommandReadTimeout {{ .Values.config.commandReadTimeout }}
+    ReadTimeout {{ .Values.config.readTimeout }}
+    SendBufTimeout {{ .Values.config.sendBufTimeout }}
+
+    # LOGGING
+    LogTime {{ .Values.config.logTime }}
+    LogClean {{ .Values.config.logClean }}
+    LogVerbose {{ .Values.config.logVerbose }}
+    ExtendedDetectionInfo {{ .Values.config.extendedDetectionInfo }}
+    LogFileMaxSize {{ .Values.config.logFileMaxSize }}
+    LogFile {{ .Values.config.logFile }}
+
+    # DATABASE
+    DatabaseDirectory /var/lib/clamav
+
+    # DAEMON
+    Foreground yes
+{{- end }}

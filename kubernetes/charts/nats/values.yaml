@@ -1,0 +1,26 @@
+namespace: buerokratt
+
+image:
+  repository: nats
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  clientPort: 4222
+  monitoringPort: 8222
+
+storage:
+  size: 5Gi
+  storageClass: ''
+
+jetstream:
+  enabled: true
+
+resources:
+  requests:
+    memory: '256Mi'
+    cpu: '250m'
+  limits:
+    memory: '512Mi'
+    cpu: '500m'

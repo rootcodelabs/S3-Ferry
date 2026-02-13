@@ -1,0 +1,51 @@
+namespace: buerokratt #change if needed
+
+image:
+  repository: clamav/clamav
+  tag: stable
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3310
+
+storage:
+  size: 5Gi
+  storageClass: ''
+
+environment:
+  noFreshclam: false
+
+healthcheck:
+  initialDelaySeconds: 120
+  periodSeconds: 60
+  timeoutSeconds: 30
+  failureThreshold: 3
+
+resources:
+  requests:
+    memory: '1Gi'
+    cpu: '500m'
+  limits:
+    memory: '2Gi'
+    cpu: '1000m'
+
+config:
+  enabled: true
+  streamMaxLength: 500M
+  maxFileSize: 500M
+  maxScanSize: 500M
+  maxRecursion: 16
+  maxFiles: 10000
+  maxDirectoryRecursion: 15
+  maxThreads: 6
+  maxConnectionQueueLength: 30
+  commandReadTimeout: 600
+  readTimeout: 600
+  sendBufTimeout: 500
+  logTime: "yes"
+  logClean: "yes"
+  logVerbose: "yes"
+  extendedDetectionInfo: "yes"
+  logFileMaxSize: 10M
+  logFile: /var/log/clamav/clamd.log

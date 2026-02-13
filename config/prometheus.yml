@@ -1,0 +1,38 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: 'development'
+    service: 's3-ferry'
+
+# Scrape configurations
+scrape_configs:
+  # S3-Ferry application metrics
+  - job_name: 's3-ferry'
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+        labels:
+          app: 's3-ferry'
+          instance: 'local-dev'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # NATS monitoring metrics (optional)
+  # - job_name: 'nats'
+  #   static_configs:
+  #     - targets: ['nats:8222']
+  #       labels:
+  #         app: 'nats'
+  #   metrics_path: '/varz'
+  #   scrape_interval: 15s
+
+  # MinIO metrics (optional)
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          app: 'minio'
+    metrics_path: '/minio/v2/metrics/cluster'
+    scrape_interval: 15s
+    bearer_token: 'YOUR_MINIO_BEARER_TOKEN'  # Optional: configure if needed
